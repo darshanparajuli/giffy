@@ -2,19 +2,20 @@
 
 use std::fs::File;
 use std::io::prelude::*;
-use std::io::{Error, ErrorKind};
 use std::mem;
 
-pub fn load(file_name: &str) -> Result<(), Error> {
-    let mut file = File::open(file_name)?;
+pub fn load(file_name: &str) -> Result<(), String> {
+    let mut file = File::open(file_name).map_err(|e| format!("Error: {}", e))?;
 
     let mut decoder = Decoder::new(&mut file);
     let result = decoder.decode()?;
 
-    println!("{:?}", result);
+    process(&result);
 
     Ok(())
 }
+
+fn process(decoder_result: &DecoderResult) {}
 
 #[derive(Debug)]
 struct Header {
@@ -142,14 +143,14 @@ struct Decoder<'a> {
 }
 
 impl<'a> Decoder<'a> {
-    pub fn new(file: &'a mut File) -> Decoder {
+    fn new(file: &'a mut File) -> Decoder {
         Decoder { file: file }
     }
 
-    pub fn decode(&mut self) -> Result<DecoderResult, Error> {
+    fn decode(&mut self) -> Result<DecoderResult, String> {
         let header = self.read_header()?;
         if header.sig != "GIF" {
-            return Err(Error::new(ErrorKind::Other, "File is not a GIF"));
+            return Err("File is not a GIF".into());
         }
 
         let logical_screen_descriptor = self.read_logical_screen_descriptor()?;
@@ -184,20 +185,14 @@ impl<'a> Decoder<'a> {
                     }
 
                     ExtensionType::Unknown(x) => {
-                        return Err(Error::new(
-                            ErrorKind::Other,
-                            format!("Unknown extension type: {:x}", x),
-                        ));
+                        return Err(format!("Error: unknown extension type: {:x}", x));
                     }
                 },
 
                 BlockType::Trailer => break,
 
                 BlockType::Unknown(x) => {
-                    return Err(Error::new(
-                        ErrorKind::Other,
-                        format!("Unknown block type: {:x}", x),
-                    ));
+                    return Err(format!("Error: unknown block type: {:x}", x));
                 }
             }
         }
@@ -209,19 +204,25 @@ impl<'a> Decoder<'a> {
         })
     }
 
-    fn read_u8(&mut self) -> Result<u8, Error> {
+    fn read_bytes(&mut self, buffer: &mut [u8]) -> Result<(), String> {
+        self.file
+            .read_exact(buffer)
+            .map_err(|e| format!("Error reading file: {}", e))
+    }
+
+    fn read_u8(&mut self) -> Result<u8, String> {
         let mut buffer = [0u8; 1];
-        self.file.read_exact(&mut buffer)?;
+        self.read_bytes(&mut buffer)?;
         Ok(buffer[0])
     }
 
-    fn read_u16(&mut self) -> Result<u16, Error> {
+    fn read_u16(&mut self) -> Result<u16, String> {
         let mut buffer = [0u8; 2];
-        self.file.read_exact(&mut buffer)?;
+        self.read_bytes(&mut buffer)?;
         Ok(unsafe { mem::transmute(buffer) })
     }
 
-    fn read_block_type(&mut self) -> Result<BlockType, Error> {
+    fn read_block_type(&mut self) -> Result<BlockType, String> {
         match self.read_u8()? {
             0x2c => Ok(BlockType::TableBasedImage),
             0x21 => {
@@ -239,25 +240,22 @@ impl<'a> Decoder<'a> {
         }
     }
 
-    fn read_header(&mut self) -> Result<Header, Error> {
+    fn read_header(&mut self) -> Result<Header, String> {
         let mut buffer = [0u8; 6];
-        self.file.read_exact(&mut buffer)?;
-        let sig = match std::str::from_utf8(&buffer[0..3]) {
-            Ok(sig) => sig.into(),
-            Err(e) => {
-                return Err(Error::new(ErrorKind::Other, format!("{}", e)));
-            }
-        };
-        let version = match std::str::from_utf8(&buffer[3..]) {
-            Ok(version) => version.into(),
-            Err(e) => {
-                return Err(Error::new(ErrorKind::Other, format!("{}", e)));
-            }
-        };
+        self.read_bytes(&mut buffer)?;
+
+        let sig = std::str::from_utf8(&buffer[0..3])
+            .map(|s| s.into())
+            .map_err(|e| format!("Error: {}", e))?;
+
+        let version = std::str::from_utf8(&buffer[3..])
+            .map(|s| s.into())
+            .map_err(|e| format!("Error: {}", e))?;
+
         Ok(Header { sig, version })
     }
 
-    fn read_logical_screen_descriptor(&mut self) -> Result<LogicalScreenDescriptor, Error> {
+    fn read_logical_screen_descriptor(&mut self) -> Result<LogicalScreenDescriptor, String> {
         let mut lsd = LogicalScreenDescriptor {
             width: 0,
             height: 0,
@@ -298,14 +296,14 @@ impl<'a> Decoder<'a> {
         if lsd.global_color_table_flag {
             let size = 3 * (1 << (lsd.global_color_table_size + 1));
             let mut table = vec![0u8; size];
-            self.file.read_exact(&mut table)?;
+            self.read_bytes(&mut table)?;
             lsd.global_color_table = Some(table);
         }
 
         Ok(lsd)
     }
 
-    fn read_image_descriptor(&mut self) -> Result<ImageDescriptor, Error> {
+    fn read_image_descriptor(&mut self) -> Result<ImageDescriptor, String> {
         let mut image_desc = ImageDescriptor {
             left: 0,
             top: 0,
@@ -331,12 +329,12 @@ impl<'a> Decoder<'a> {
         Ok(image_desc)
     }
 
-    fn read_table_based_image(&mut self) -> Result<TableBasedImage, Error> {
+    fn read_table_based_image(&mut self) -> Result<TableBasedImage, String> {
         let image_descriptor = self.read_image_descriptor()?;
         let local_color_table = if image_descriptor.local_color_table_flag {
             let size = 3 * (1 << (image_descriptor.local_color_table_size + 1));
             let mut table = vec![0u8; size];
-            self.file.read_exact(&mut table)?;
+            self.read_bytes(&mut table)?;
             Some(table)
         } else {
             None
@@ -355,7 +353,7 @@ impl<'a> Decoder<'a> {
         })
     }
 
-    fn read_data_sub_blocks(&mut self) -> Result<Vec<u8>, Error> {
+    fn read_data_sub_blocks(&mut self) -> Result<Vec<u8>, String> {
         let mut sub_blocks = Vec::new();
 
         loop {
@@ -367,7 +365,7 @@ impl<'a> Decoder<'a> {
             }
 
             let mut data = vec![0u8; block_size as usize];
-            self.file.read_exact(&mut data)?;
+            self.read_bytes(&mut data)?;
 
             sub_blocks.extend_from_slice(&data);
         }
@@ -375,24 +373,24 @@ impl<'a> Decoder<'a> {
         Ok(sub_blocks)
     }
 
-    fn read_application_extension(&mut self) -> Result<ApplicationExtension, Error> {
+    fn read_application_extension(&mut self) -> Result<ApplicationExtension, String> {
         let block_size = self.read_u8()?;
         if block_size != 11 {
-            return Err(Error::new(
-                ErrorKind::Other,
-                format!("Invalid application extension block size: {}", block_size),
+            return Err(format!(
+                "Error: invalid application extension block size: {}",
+                block_size
             ));
         }
 
         let id = {
             let mut buffer = [0u8; 8];
-            self.file.read_exact(&mut buffer)?;
+            self.read_bytes(&mut buffer)?;
             std::str::from_utf8(&buffer).unwrap().into()
         };
 
         let auth_code = {
             let mut buffer = [0u8; 3];
-            self.file.read_exact(&mut buffer)?;
+            self.read_bytes(&mut buffer)?;
             std::str::from_utf8(&buffer).unwrap().into()
         };
 
@@ -405,26 +403,18 @@ impl<'a> Decoder<'a> {
         })
     }
 
-    fn read_comment_extension(&mut self) -> Result<CommentExtension, Error> {
+    fn read_comment_extension(&mut self) -> Result<CommentExtension, String> {
         let data = self.read_data_sub_blocks()?;
-        let text = match String::from_utf8(data) {
-            Ok(text) => text,
-            Err(e) => {
-                return Err(Error::new(ErrorKind::Other, format!("{}", e)));
-            }
-        };
+        let text = String::from_utf8(data).map_err(|e| format!("Error: {}", e))?;
         Ok(CommentExtension { text })
     }
 
-    fn read_graphic_control_extension(&mut self) -> Result<GraphicControlExtension, Error> {
+    fn read_graphic_control_extension(&mut self) -> Result<GraphicControlExtension, String> {
         let block_size = self.read_u8()?;
         if block_size != 4 {
-            return Err(Error::new(
-                ErrorKind::Other,
-                format!(
-                    "Invalid Graphic Control Extension block size: {}",
-                    block_size
-                ),
+            return Err(format!(
+                "Error: invalid Graphic Control Extension block size: {}",
+                block_size
             ));
         }
 
@@ -436,10 +426,7 @@ impl<'a> Decoder<'a> {
             3 => DisposalMethod::RestoreToPrevious,
             4 | 5 | 6 | 7 => DisposalMethod::Undefined,
             x => {
-                return Err(Error::new(
-                    ErrorKind::Other,
-                    format!("Invalid disposal method: {}", x),
-                ));
+                return Err(format!("Error: invalid disposal method: {}", x));
             }
         };
 
@@ -449,10 +436,7 @@ impl<'a> Decoder<'a> {
         let transparent_color_index = self.read_u8()?;
 
         if self.read_u8()? != 0 {
-            return Err(Error::new(
-                ErrorKind::Other,
-                format!("Block terminator not found for Graphic Control Extension!"),
-            ));
+            return Err("Error: block terminator not found for Graphic Control Extension!".into());
         }
 
         Ok(GraphicControlExtension {
@@ -464,12 +448,12 @@ impl<'a> Decoder<'a> {
         })
     }
 
-    fn read_plain_text_extension(&mut self) -> Result<PlainTextExtension, Error> {
+    fn read_plain_text_extension(&mut self) -> Result<PlainTextExtension, String> {
         let block_size = self.read_u8()?;
         if block_size != 12 {
-            return Err(Error::new(
-                ErrorKind::Other,
-                format!("Plain Text Extension invalid block size: {}", block_size),
+            return Err(format!(
+                "Error: Plain Text Extension invalid block size: {}",
+                block_size
             ));
         }
 
@@ -484,12 +468,7 @@ impl<'a> Decoder<'a> {
         let text_bg_color_index = self.read_u8()?;
 
         let data = self.read_data_sub_blocks()?;
-        let plain_text_data = match String::from_utf8(data) {
-            Ok(text) => text,
-            Err(e) => {
-                return Err(Error::new(ErrorKind::Other, format!("{}", e)));
-            }
-        };
+        let plain_text_data = String::from_utf8(data).map_err(|e| format!("Error: {}", e))?;
 
         return Ok(PlainTextExtension {
             text_grid_left_pos,
