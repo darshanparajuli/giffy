@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 #![allow(unused_doc_comments)]
 
 use std::fs::File;
