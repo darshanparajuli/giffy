@@ -1,8 +1,12 @@
 extern crate giffy;
 
+use std::env;
+
 fn main() {
-    match giffy::load("test.gif") {
-        Ok(_) => {}
-        Err(e) => println!("{}", e),
+    for a in env::args().skip(1) {
+        match giffy::load(&a) {
+            Ok(_) => {}
+            Err(e) => println!("{}", e),
+        }
     }
 }
