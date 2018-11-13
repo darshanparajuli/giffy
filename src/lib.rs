@@ -150,7 +150,7 @@ impl<'a> Decoder<'a> {
     fn decode(&mut self) -> Result<DecoderResult, String> {
         let header = self.read_header()?;
         if header.sig != "GIF" {
-            return Err("File is not a GIF".into());
+            return Err("Error: file is not a GIF".into());
         }
 
         let logical_screen_descriptor = self.read_logical_screen_descriptor()?;
@@ -207,7 +207,7 @@ impl<'a> Decoder<'a> {
     fn read_bytes(&mut self, buffer: &mut [u8]) -> Result<(), String> {
         self.file
             .read_exact(buffer)
-            .map_err(|e| format!("Error reading file: {}", e))
+            .map_err(|e| format!("Error: {}", e))
     }
 
     fn read_u8(&mut self) -> Result<u8, String> {
@@ -377,7 +377,7 @@ impl<'a> Decoder<'a> {
         let block_size = self.read_u8()?;
         if block_size != 11 {
             return Err(format!(
-                "Error: invalid application extension block size: {}",
+                "Error: invalid Application Extension block size: {}",
                 block_size
             ));
         }
@@ -436,7 +436,7 @@ impl<'a> Decoder<'a> {
         let transparent_color_index = self.read_u8()?;
 
         if self.read_u8()? != 0 {
-            return Err("Error: block terminator not found for Graphic Control Extension!".into());
+            return Err("Error: block terminator not found for Graphic Control Extension".into());
         }
 
         Ok(GraphicControlExtension {
@@ -452,7 +452,7 @@ impl<'a> Decoder<'a> {
         let block_size = self.read_u8()?;
         if block_size != 12 {
             return Err(format!(
-                "Error: Plain Text Extension invalid block size: {}",
+                "Error: invalid Plain Text Extension block size: {}",
                 block_size
             ));
         }
