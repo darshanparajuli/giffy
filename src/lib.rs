@@ -55,11 +55,11 @@ enum ExtensionType {
 
 #[derive(Debug)]
 enum DataType {
-    GraphicControlExtensionType(GraphicControlExtension),
-    TableBasedImageType(TableBasedImage),
-    PlainTextExtensionType(PlainTextExtension),
     ApplicationExtensionType(ApplicationExtension),
     CommentExtensionType(CommentExtension),
+    GraphicControlExtensionType(GraphicControlExtension),
+    PlainTextExtensionType(PlainTextExtension),
+    TableBasedImageType(TableBasedImage),
 }
 
 #[derive(Debug)]
