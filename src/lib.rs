@@ -367,7 +367,7 @@ impl<'a> Decoder<'a> {
             let mut data = vec![0u8; block_size as usize];
             self.read_bytes(&mut data)?;
 
-            sub_blocks.extend_from_slice(&data);
+            sub_blocks.append(&mut data);
         }
 
         Ok(sub_blocks)
