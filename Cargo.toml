@@ -1,6 +1,9 @@
 [package]
 name = "giffy"
 version = "0.1.0"
+edition = "2018"
 authors = ["Darshan Parajuli <parajulidarshan@gmail.com>"]
 
 [dependencies]
+image = "0.21.1"
+
