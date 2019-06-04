@@ -19,7 +19,7 @@ impl<'a> Decompressor<'a> {
             data_sub_blocks,
             color_table,
             lzw_min_code_size,
-            clear_code: color_table.len(),
+            clear_code: 1 << lzw_min_code_size,
             code_table: Vec::new(),
             code_size: lzw_min_code_size + 1,
         }
@@ -29,8 +29,8 @@ impl<'a> Decompressor<'a> {
         self.code_size = self.lzw_min_code_size + 1;
 
         self.code_table.clear();
-        for i in 0..self.color_table.len() {
-            self.code_table.push(CodeValue::Indices(vec![i]));
+        for i in 0..self.clear_code {
+            self.code_table.push(CodeValue::Indices(vec![i as usize]));
         }
 
         self.code_table.push(CodeValue::Single(self.clear_code));
@@ -116,7 +116,7 @@ impl<'a> Decompressor<'a> {
                         if *c == self.clear_code {
                             return Ok(true);
                         } else if *c == self.clear_code + 1 {
-                            break;
+                            return Ok(false);
                         } else {
                             return Err(format!("Invalid single code {}", c));
                         }
@@ -160,8 +160,6 @@ impl<'a> Decompressor<'a> {
 
             prev = current;
         }
-
-        Ok(false)
     }
 
     fn expect_clear_code(&self, code_reader: &mut CodeReader) -> Result<(), String> {
@@ -169,7 +167,7 @@ impl<'a> Decompressor<'a> {
             if c as usize != self.clear_code {
                 return Err(format!(
                     "Invalid clear code {}, expected: {}",
-                    c, self.clear_code
+                    c, self.code_size
                 ));
             }
         } else {
@@ -182,13 +180,14 @@ impl<'a> Decompressor<'a> {
     pub(crate) fn decompress(&mut self) -> Result<Vec<Color>, String> {
         let mut result = vec![];
 
-        self.reset();
-
         let mut code_reader = CodeReader::new(self.data_sub_blocks);
         self.expect_clear_code(&mut code_reader)?;
 
-        while self.decompress_until_clear(&mut code_reader, &mut result)? {
+        loop {
             self.reset();
+            if !self.decompress_until_clear(&mut code_reader, &mut result)? {
+                break;
+            }
         }
 
         // println!("result count: {}", result.len());

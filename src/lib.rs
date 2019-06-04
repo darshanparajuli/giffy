@@ -17,7 +17,7 @@ pub fn load(file_name: &str) -> Result<Gif, String> {
     let mut parser = Parser::new(&mut file);
     let result = parser.parse()?;
 
-    println!("{:?}", result.logical_screen_descriptor);
+    // println!("{:?}\n\n", result);
 
     let decoder = Decoder::new(&result);
     let frames = decoder.decode()?;
@@ -60,34 +60,27 @@ impl<'a> Decoder<'a> {
                 DataType::GraphicControlExtensionType(_) => {}
                 DataType::PlainTextExtensionType(_) => {}
                 DataType::TableBasedImageType(image) => {
-                    let table = {
+                    let color_table = {
                         if image.local_color_table.is_some() {
-                            image.local_color_table.as_ref()
+                            image.local_color_table.as_ref().unwrap()
                         } else {
                             self.data
                                 .logical_screen_descriptor
                                 .global_color_table
                                 .as_ref()
+                                .expect("Global color table is missing!")
                         }
                     };
 
-                    // if color_table.is_none() {
-                    //     color_table.replace(table.expect("color table is missing"));
-                    // } else {
-                    //     if table.is_some() {
-                    //         color_table.replace(table.expect("color table is missing"));
-                    //     }
-                    // }
-
-                    let color_table = table.unwrap();
                     let mut decompressor = Decompressor::new(
                         &image.image_data.data_sub_blocks,
                         &color_table,
                         image.image_data.lzw_min_code_size,
                     );
 
+                    // println!("\nimage: {:?}", image);
                     let result = decompressor.decompress()?;
-                    println!("result len: {}", result.len());
+                    // println!("  result len: {}", result.len());
 
                     if frames.is_empty() {
                         frames.push(ImageFrame {
@@ -95,16 +88,24 @@ impl<'a> Decoder<'a> {
                         });
                     } else {
                         let top = image.image_descriptor.top as usize;
+                        let height = image.image_descriptor.height as usize;
                         let left = image.image_descriptor.left as usize;
+                        let width = image.image_descriptor.width as usize;
                         let image_width = self.data.logical_screen_descriptor.width as usize;
 
                         let mut new_frame = frames.last().unwrap().clone();
-                        println!("last len: {}", new_frame.color_values.len());
 
-                        let offset = top * image_width + left;
-                        for i in 0..result.len() {
-                            new_frame.color_values[offset + i] = result[i];
+                        for y in 0..height {
+                            let offset = (top + y) * image_width + left;
+                            for x in 0..width {
+                                new_frame.color_values[offset + x] = result[y * width + x];
+                            }
                         }
+
+                        // println!("offset: {}", offset);
+                        // for i in 0..result.len() {
+                        //     new_frame.color_values[offset + top] = result[i];
+                        // }
 
                         frames.push(new_frame);
                     }
