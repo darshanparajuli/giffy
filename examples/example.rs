@@ -38,9 +38,8 @@ fn main() -> Result<(), io::Error> {
 
                 let mut colors = vec![];
                 for c in frame.color_values.iter() {
-                    colors.push(c.r());
-                    colors.push(c.g());
-                    colors.push(c.b());
+                    let values: [u8; 3] = (*c).into();
+                    colors.extend(&values);
                 }
 
                 encoder.encode(&colors, gif.width, gif.height, ColorType::RGB(8))?;
