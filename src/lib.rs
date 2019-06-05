@@ -9,12 +9,13 @@ pub use util::Color;
 
 use parser::*;
 
-use std::fs::File;
+use std::io::Read;
 
-pub fn load(file_name: &str) -> Result<Gif, String> {
-    let mut file = File::open(file_name).map_err(|e| format!("Error: {}", e))?;
-
-    let mut parser = Parser::new(&mut file);
+pub fn load<R>(stream: &mut R) -> Result<Gif, String>
+where
+    R: Read,
+{
+    let mut parser = Parser::new(stream);
     let result = parser.parse()?;
 
     let decoder = Decoder::new(&result);

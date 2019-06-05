@@ -6,11 +6,11 @@ use std::path::Path;
 
 fn main() -> Result<(), std::io::Error> {
     for a in env::args().skip(1) {
-        match giffy::load(&a) {
+        let path = Path::new(&a);
+        let mut file = File::open(&path)?;
+        match giffy::load(&mut file) {
             Ok(gif) => {
                 println!("Frame count: {}", gif.image_frames.len());
-                let path = Path::new(&a);
-
                 let mut counter = 1;
                 for frame in gif.image_frames {
                     let file_name = format!(
