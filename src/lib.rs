@@ -10,6 +10,7 @@ use std::io::Read;
 
 pub use util::Color;
 
+/// This struct holds the width, height and the image frames of the gif media.
 #[derive(Debug, Clone)]
 pub struct Gif {
     pub width: u32,
@@ -17,12 +18,13 @@ pub struct Gif {
     pub image_frames: Vec<ImageFrame>,
 }
 
+/// This struct holds the color values of the image frame.
 #[derive(Debug, Clone)]
 pub struct ImageFrame {
     pub color_values: Box<[Color]>,
 }
 
-/// Attempt to load a gif from a readable `src`.
+/// Attempt to load a gif from a given `src`.
 ///
 /// # Errors
 ///
