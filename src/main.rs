@@ -1,6 +1,3 @@
-use giffy;
-use image;
-
 use image::bmp::BMPEncoder;
 use image::ColorType;
 use std::env;

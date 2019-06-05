@@ -67,15 +67,6 @@ impl<'a> Decompressor<'a> {
                 return Ok(false);
             }
 
-            // println!(
-            //     "clear_code: {}, code_size: {}, prev: {:?}, current: {}, table size: {}",
-            //     self.clear_code,
-            //     self.code_size,
-            //     prev,
-            //     current,
-            //     self.code_table.len()
-            // );
-
             if (current as usize) < self.code_table.len() {
                 match &self.code_table[current as usize] {
                     CodeValue::Indices(indices) => {
@@ -90,12 +81,6 @@ impl<'a> Decompressor<'a> {
                                 new_indices.push(*i);
                             }
                             new_indices.push(k);
-
-                            // println!(
-                            //     "code size: {}, table size: {}",
-                            //     self.code_size,
-                            //     self.code_table.len()
-                            // );
 
                             if self.code_table.len() == (1 << self.code_size) - 1 {
                                 if self.code_size == 12 {
@@ -135,12 +120,6 @@ impl<'a> Decompressor<'a> {
                     for i in output.iter() {
                         result.push(*i);
                     }
-
-                    // println!(
-                    //     "code size: {}, table size: {}",
-                    //     self.code_size,
-                    //     self.code_table.len()
-                    // );
 
                     if self.code_table.len() == (1 << self.code_size) - 1 {
                         if self.code_size == 12 {
@@ -189,8 +168,6 @@ impl<'a> Decompressor<'a> {
                 break;
             }
         }
-
-        // println!("result count: {}", result.len());
 
         Ok(result
             .iter()

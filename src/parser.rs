@@ -57,7 +57,7 @@ pub(crate) struct GraphicControlExtension {
     pub(crate) transparent_color_index: u8,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub(crate) enum DisposalMethod {
     Unspecified,
     DoNotDispose,
