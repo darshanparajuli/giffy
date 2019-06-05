@@ -5,17 +5,33 @@ mod parser;
 mod util;
 
 use decompressor::Decompressor;
-pub use util::Color;
-
 use parser::*;
-
 use std::io::Read;
 
-pub fn load<R>(stream: &mut R) -> Result<Gif, String>
+pub use util::Color;
+
+#[derive(Debug, Clone)]
+pub struct Gif {
+    pub width: u32,
+    pub height: u32,
+    pub image_frames: Vec<ImageFrame>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ImageFrame {
+    pub color_values: Box<[Color]>,
+}
+
+/// Attempt to load a gif from a readable `src`.
+///
+/// # Errors
+///
+/// This function will return an error if the gif src is not a valid gif format.
+pub fn load<R>(src: &mut R) -> Result<Gif, String>
 where
     R: Read,
 {
-    let mut parser = Parser::new(stream);
+    let mut parser = Parser::new(src);
     let result = parser.parse()?;
 
     let decoder = Decoder::new(&result);
@@ -26,18 +42,6 @@ where
         width: result.logical_screen_descriptor.width as u32,
         height: result.logical_screen_descriptor.height as u32,
     })
-}
-
-#[derive(Debug)]
-pub struct Gif {
-    pub width: u32,
-    pub height: u32,
-    pub image_frames: Vec<ImageFrame>,
-}
-
-#[derive(Debug, Clone)]
-pub struct ImageFrame {
-    pub color_values: Box<[Color]>,
 }
 
 struct Decoder<'a> {
@@ -149,7 +153,6 @@ impl<'a> Decoder<'a> {
 mod tests {
 
     use super::*;
-    use std::io::prelude::*;
 
     struct MockReader<'a> {
         data: &'a [u8],

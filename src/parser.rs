@@ -125,12 +125,12 @@ pub(crate) struct ParseResult {
 
 #[derive(Debug)]
 pub(crate) struct Parser<'a, T: Read> {
-    stream: &'a mut T,
+    src: &'a mut T,
 }
 
 impl<'a, T: Read> Parser<'a, T> {
-    pub(crate) fn new(stream: &'a mut T) -> Self {
-        Self { stream }
+    pub(crate) fn new(src: &'a mut T) -> Self {
+        Self { src }
     }
 
     pub(crate) fn parse(&mut self) -> Result<ParseResult, String> {
@@ -191,7 +191,7 @@ impl<'a, T: Read> Parser<'a, T> {
     }
 
     fn read_bytes(&mut self, buffer: &mut [u8]) -> Result<(), String> {
-        self.stream
+        self.src
             .read_exact(buffer)
             .map_err(|e| format!("Error: {}", e))
     }
