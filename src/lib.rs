@@ -91,15 +91,17 @@ impl<'a> Decoder<'a> {
                             None => (false, 0, DisposalMethod::Unspecified),
                         };
 
+                    graphic_control_ext = None;
+
                     let mut decompressor = Decompressor::new(
                         &image.image_data.data_sub_blocks,
-                        &color_table,
                         image.image_data.lzw_min_code_size,
                     );
 
                     let result = decompressor.decompress()?;
 
                     if frames.is_empty() {
+                        let result = result.iter().map(|i| color_table[*i]).collect::<Vec<_>>();
                         frames.push(ImageFrame {
                             color_values: result.into_boxed_slice(),
                         });
@@ -110,33 +112,45 @@ impl<'a> Decoder<'a> {
                         let width = image.image_descriptor.width as usize;
                         let image_width = self.data.logical_screen_descriptor.width as usize;
 
-                        let mut new_frame =
-                            if disposal_method == DisposalMethod::RestoreToBackgroundColor {
-                                ImageFrame {
-                                    color_values: vec![
-                                        color_table[self
-                                            .data
-                                            .logical_screen_descriptor
-                                            .background_color_index
-                                            as usize];
-                                        frames.last().unwrap().color_values.len()
-                                    ]
-                                    .into_boxed_slice(),
-                                }
-                            } else {
-                                frames.last().unwrap().clone()
-                            };
+                        let result = if transparent_flag {
+                            result
+                                .iter()
+                                .map(|i| {
+                                    if *i == transparent_color_index as usize {
+                                        None
+                                    } else {
+                                        Some(color_table[*i])
+                                    }
+                                })
+                                .collect::<Vec<_>>()
+                        } else {
+                            result
+                                .iter()
+                                .map(|i| Some(color_table[*i]))
+                                .collect::<Vec<_>>()
+                        };
+
+                        let mut new_frame = match disposal_method {
+                            DisposalMethod::RestoreToBackgroundColor => ImageFrame {
+                                color_values: vec![
+                                    color_table[self
+                                        .data
+                                        .logical_screen_descriptor
+                                        .background_color_index
+                                        as usize];
+                                    frames.last().unwrap().color_values.len()
+                                ]
+                                .into_boxed_slice(),
+                            },
+                            _ => frames.last().unwrap().clone(),
+                        };
 
                         for y in 0..height {
                             let offset = (top + y) * image_width + left;
                             for x in 0..width {
-                                if transparent_flag {
-                                    let color = color_table[transparent_color_index as usize];
-                                    if color != result[y * width + x] {
-                                        new_frame.color_values[offset + x] = result[y * width + x];
-                                    }
-                                } else {
-                                    new_frame.color_values[offset + x] = result[y * width + x];
+                                let c = result[y * width + x];
+                                if let Some(c) = c {
+                                    new_frame.color_values[offset + x] = c;
                                 }
                             }
                         }

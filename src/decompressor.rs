@@ -1,8 +1,5 @@
-use crate::util::Color;
-
 pub(crate) struct Decompressor<'a> {
     data_sub_blocks: &'a [u8],
-    color_table: &'a [Color],
     lzw_min_code_size: u8,
     clear_code: usize,
     code_table: Vec<CodeValue>,
@@ -10,14 +7,9 @@ pub(crate) struct Decompressor<'a> {
 }
 
 impl<'a> Decompressor<'a> {
-    pub(crate) fn new(
-        data_sub_blocks: &'a [u8],
-        color_table: &'a [Color],
-        lzw_min_code_size: u8,
-    ) -> Self {
+    pub(crate) fn new(data_sub_blocks: &'a [u8], lzw_min_code_size: u8) -> Self {
         Self {
             data_sub_blocks,
-            color_table,
             lzw_min_code_size,
             clear_code: 1 << lzw_min_code_size,
             code_table: Vec::new(),
@@ -156,7 +148,7 @@ impl<'a> Decompressor<'a> {
         Ok(())
     }
 
-    pub(crate) fn decompress(&mut self) -> Result<Vec<Color>, String> {
+    pub(crate) fn decompress(&mut self) -> Result<Vec<usize>, String> {
         let mut result = vec![];
 
         let mut code_reader = CodeReader::new(self.data_sub_blocks);
@@ -169,10 +161,7 @@ impl<'a> Decompressor<'a> {
             }
         }
 
-        Ok(result
-            .iter()
-            .map(|i| self.color_table[*i])
-            .collect::<Vec<_>>())
+        Ok(result)
     }
 }
 
