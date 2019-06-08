@@ -1,3 +1,25 @@
+//! giffy is a simple GIF decoder.
+//!
+//! # Example
+//!
+//! ```no_run
+//! use giffy;
+//! use std::fs::File;
+//!
+//! let mut src = File::open("<gif path>").expect("File not found");
+//! match giffy::load(&mut src) {
+//!     Ok(gif) => {
+//!         for frame in gif.image_frames {
+//!             // do something with frames
+//!         }
+//!     }
+//!
+//!     Err(e) => {
+//!         eprintln!("Error: {}", e);
+//!     }
+//! }
+//! ```
+
 mod decompressor;
 mod parser;
 mod util;
