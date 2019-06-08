@@ -1,4 +1,7 @@
 # giffy
+
+[![crates.io](https://img.shields.io/crates/v/giffy.svg)](https://crates.io/crates/giffy)
+
 A simple GIF decoder written in Rust.
 
 ## Usage
