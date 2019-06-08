@@ -3,6 +3,12 @@ name = "giffy"
 version = "0.1.0"
 edition = "2018"
 authors = ["Darshan Parajuli <parajulidarshan@gmail.com>"]
+description = "A simple GIF decoder."
+repository = "https://github.com/darshanparajuli/giffy"
+readme = "README.md"
+keywords = ["gif", "decoder", "giffy", "image"]
+categories = ["multimedia::images", "multimedia::encoding"]
+license = "MIT"
 
 [dev-dependencies]
 image = "0.21.1"
