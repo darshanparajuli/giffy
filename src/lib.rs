@@ -123,7 +123,10 @@ impl<'a> Decoder<'a> {
                         };
 
                         frames.push(TempFrame {
-                            colors: result.iter().map(|e| e.unwrap()).collect(),
+                            colors: result
+                                .iter()
+                                .map(|e| e.expect("Missing color value"))
+                                .collect(),
                             interlaced: image.image_descriptor.interlace_flag,
                         });
                     } else {
