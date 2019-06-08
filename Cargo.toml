@@ -12,4 +12,4 @@ license = "MIT"
 
 [dev-dependencies]
 image = "0.21.1"
-
+rayon = "1.0.3"

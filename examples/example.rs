@@ -1,5 +1,6 @@
 use image::bmp::BMPEncoder;
 use image::ColorType;
+use rayon::prelude::*;
 use std::env;
 use std::fs::File;
 use std::io;
@@ -22,6 +23,8 @@ fn main() -> Result<(), io::Error> {
         Ok(gif) => {
             println!("Frame count: {}", gif.image_frames.len());
 
+            let mut tasks = vec![];
+
             let mut counter = 1;
             for frame in gif.image_frames {
                 let file_name = format!(
@@ -31,10 +34,25 @@ fn main() -> Result<(), io::Error> {
                 );
                 output_path.push(&file_name);
 
-                let mut file = File::create(&output_path)?;
+                tasks.push((counter, frame, output_path.clone()));
+
+                output_path.pop();
+                counter += 1;
+            }
+
+            let width = gif.width;
+            let height = gif.height;
+            tasks.par_iter().for_each(|e| {
+                let (counter, frame, path) = e;
+
+                let mut file = File::create(&path).expect("File not found");
                 let mut encoder = BMPEncoder::new(&mut file);
 
-                println!("Writing frame #{} to '{}'", counter, file_name);
+                println!(
+                    "Writing frame #{} to '{}'",
+                    counter,
+                    path.file_name().unwrap().to_str().unwrap()
+                );
 
                 let mut colors = vec![];
                 for c in frame.colors.iter() {
@@ -42,11 +60,10 @@ fn main() -> Result<(), io::Error> {
                     colors.extend(&values);
                 }
 
-                encoder.encode(&colors, gif.width, gif.height, ColorType::RGB(8))?;
-
-                output_path.pop();
-                counter += 1;
-            }
+                encoder
+                    .encode(&colors, width, height, ColorType::RGB(8))
+                    .expect("Error encoding");
+            });
         }
 
         Err(e) => println!("{}", e),
