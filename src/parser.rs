@@ -257,12 +257,10 @@ impl<'a, T: Read> Parser<'a, T> {
         lsd.width = self.read_u16()?;
         lsd.height = self.read_u16()?;
 
-        /**
-         * Global Color Table Flag       1 Bit
-         * Color Resolution              3 Bits
-         * Sort Flag                     1 Bit
-         * Size of Global Color Table    3 Bits
-         */
+        // Global Color Table Flag       1 Bit
+        // Color Resolution              3 Bits
+        // Sort Flag                     1 Bit
+        // Size of Global Color Table    3 Bits
         let packed_fields = self.read_u8()?;
         lsd.global_color_table_flag = (packed_fields >> 7) == 1;
         lsd.color_resolution = (packed_fields & 0b0111_0000) >> 4;

@@ -1,5 +1,3 @@
-#![allow(unused_doc_comments)]
-
 mod decompressor;
 mod parser;
 mod util;
