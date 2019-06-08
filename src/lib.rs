@@ -46,12 +46,6 @@ where
     })
 }
 
-#[derive(Clone)]
-struct TempFrame {
-    interlaced: bool,
-    colors: Vec<Color>,
-}
-
 struct Decoder<'a> {
     data: &'a ParseResult,
 }
@@ -122,12 +116,11 @@ impl<'a> Decoder<'a> {
                             result
                         };
 
-                        frames.push(TempFrame {
+                        frames.push(ImageFrame {
                             colors: result
                                 .iter()
                                 .map(|e| e.expect("Missing color value"))
                                 .collect(),
-                            interlaced: image.image_descriptor.interlace_flag,
                         });
                     } else {
                         let top = image.image_descriptor.top as usize;
@@ -155,7 +148,7 @@ impl<'a> Decoder<'a> {
                         };
 
                         let mut new_frame = match disposal_method {
-                            DisposalMethod::RestoreToBackgroundColor => TempFrame {
+                            DisposalMethod::RestoreToBackgroundColor => ImageFrame {
                                 colors: vec![
                                     color_table[self
                                         .data
@@ -163,8 +156,8 @@ impl<'a> Decoder<'a> {
                                         .background_color_index
                                         as usize];
                                     frames.last().unwrap().colors.len()
-                                ],
-                                interlaced: image.image_descriptor.interlace_flag,
+                                ]
+                                .into_boxed_slice(),
                             },
                             DisposalMethod::DoNotDispose | DisposalMethod::Unspecified => {
                                 frames.last().unwrap().clone()
@@ -194,26 +187,7 @@ impl<'a> Decoder<'a> {
             }
         }
 
-        let mut result = vec![];
-
-        for frame in frames {
-            // if frame.interlaced {
-            //     let deinterlaced = Self::deinterlace(
-            //         frame.colors,
-            //         self.data.logical_screen_descriptor.width as usize,
-            //         self.data.logical_screen_descriptor.height as usize,
-            //     );
-            //     result.push(ImageFrame {
-            //         colors: deinterlaced.into_boxed_slice(),
-            //     });
-            // } else {
-            result.push(ImageFrame {
-                colors: frame.colors.into_boxed_slice(),
-            });
-            // }
-        }
-
-        Ok(result)
+        Ok(frames)
     }
 
     fn deinterlace(input: Vec<Option<Color>>, width: usize, height: usize) -> Vec<Option<Color>> {
