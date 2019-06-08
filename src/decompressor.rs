@@ -6,6 +6,7 @@ pub(crate) struct Decompressor<'a> {
     code_size: u8,
 }
 
+// Refer to https://www.w3.org/Graphics/GIF/spec-gif89a.txt for details.
 impl<'a> Decompressor<'a> {
     pub(crate) fn new(data_sub_blocks: &'a [u8], lzw_min_code_size: u8) -> Self {
         Self {

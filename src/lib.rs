@@ -190,6 +190,7 @@ impl<'a> Decoder<'a> {
         Ok(frames)
     }
 
+    // Refer to https://www.w3.org/Graphics/GIF/spec-gif89a.txt for details.
     fn deinterlace(input: Vec<Option<Color>>, width: usize, height: usize) -> Vec<Option<Color>> {
         let mut result = vec![None; width * height];
 
