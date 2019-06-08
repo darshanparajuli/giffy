@@ -235,6 +235,7 @@ impl<'a> CodeReader<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::util::Color;
 
     #[test]
     fn test_code_reader_read() {
@@ -376,8 +377,15 @@ mod tests {
             Color(0, 0, 255),
             Color(0, 0, 0),
         ];
-        let mut decompressor = Decompressor::new(&input, &color_table, 2);
-        let actual = decompressor.decompress().unwrap();
+
+        let mut decompressor = Decompressor::new(&input, 2);
+        let actual = decompressor
+            .decompress()
+            .unwrap()
+            .iter()
+            .map(|i| color_table[*i])
+            .collect::<Vec<_>>();
+
         assert_eq!(expected, actual);
     }
 }

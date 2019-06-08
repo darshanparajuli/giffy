@@ -21,7 +21,7 @@ pub struct Gif {
 /// This struct holds the color values of the image frame.
 #[derive(Debug, Clone)]
 pub struct ImageFrame {
-    pub color_values: Box<[Color]>,
+    pub colors: Box<[Color]>,
 }
 
 /// Attempt to load a GIF from a given `src`.
@@ -44,6 +44,12 @@ where
         width: result.logical_screen_descriptor.width as u32,
         height: result.logical_screen_descriptor.height as u32,
     })
+}
+
+#[derive(Clone)]
+struct TempFrame {
+    interlaced: bool,
+    colors: Vec<Color>,
 }
 
 struct Decoder<'a> {
@@ -98,12 +104,27 @@ impl<'a> Decoder<'a> {
                         image.image_data.lzw_min_code_size,
                     );
 
-                    let result = decompressor.decompress()?;
+                    let index_table = decompressor.decompress()?;
 
                     if frames.is_empty() {
-                        let result = result.iter().map(|i| color_table[*i]).collect::<Vec<_>>();
-                        frames.push(ImageFrame {
-                            color_values: result.into_boxed_slice(),
+                        let result = index_table
+                            .iter()
+                            .map(|i| Some(color_table[*i]))
+                            .collect::<Vec<_>>();
+
+                        let result = if image.image_descriptor.interlace_flag {
+                            Self::deinterlace(
+                                result,
+                                self.data.logical_screen_descriptor.width as usize,
+                                self.data.logical_screen_descriptor.height as usize,
+                            )
+                        } else {
+                            result
+                        };
+
+                        frames.push(TempFrame {
+                            colors: result.iter().map(|e| e.unwrap()).collect(),
+                            interlaced: image.image_descriptor.interlace_flag,
                         });
                     } else {
                         let top = image.image_descriptor.top as usize;
@@ -113,7 +134,7 @@ impl<'a> Decoder<'a> {
                         let image_width = self.data.logical_screen_descriptor.width as usize;
 
                         let result = if transparent_flag {
-                            result
+                            index_table
                                 .iter()
                                 .map(|i| {
                                     if *i == transparent_color_index as usize {
@@ -124,25 +145,34 @@ impl<'a> Decoder<'a> {
                                 })
                                 .collect::<Vec<_>>()
                         } else {
-                            result
+                            index_table
                                 .iter()
                                 .map(|i| Some(color_table[*i]))
                                 .collect::<Vec<_>>()
                         };
 
                         let mut new_frame = match disposal_method {
-                            DisposalMethod::RestoreToBackgroundColor => ImageFrame {
-                                color_values: vec![
+                            DisposalMethod::RestoreToBackgroundColor => TempFrame {
+                                colors: vec![
                                     color_table[self
                                         .data
                                         .logical_screen_descriptor
                                         .background_color_index
                                         as usize];
-                                    frames.last().unwrap().color_values.len()
-                                ]
-                                .into_boxed_slice(),
+                                    frames.last().unwrap().colors.len()
+                                ],
+                                interlaced: image.image_descriptor.interlace_flag,
                             },
-                            _ => frames.last().unwrap().clone(),
+                            DisposalMethod::DoNotDispose | DisposalMethod::Unspecified => {
+                                frames.last().unwrap().clone()
+                            }
+                            d @ _ => return Err(format!("Dispose method {:?} not supported", d)),
+                        };
+
+                        let result = if image.image_descriptor.interlace_flag {
+                            Self::deinterlace(result, width, height)
+                        } else {
+                            result
                         };
 
                         for y in 0..height {
@@ -150,7 +180,7 @@ impl<'a> Decoder<'a> {
                             for x in 0..width {
                                 let c = result[y * width + x];
                                 if let Some(c) = c {
-                                    new_frame.color_values[offset + x] = c;
+                                    new_frame.colors[offset + x] = c;
                                 }
                             }
                         }
@@ -161,7 +191,86 @@ impl<'a> Decoder<'a> {
             }
         }
 
-        Ok(frames)
+        let mut result = vec![];
+
+        for frame in frames {
+            // if frame.interlaced {
+            //     let deinterlaced = Self::deinterlace(
+            //         frame.colors,
+            //         self.data.logical_screen_descriptor.width as usize,
+            //         self.data.logical_screen_descriptor.height as usize,
+            //     );
+            //     result.push(ImageFrame {
+            //         colors: deinterlaced.into_boxed_slice(),
+            //     });
+            // } else {
+            result.push(ImageFrame {
+                colors: frame.colors.into_boxed_slice(),
+            });
+            // }
+        }
+
+        Ok(result)
+    }
+
+    fn deinterlace(input: Vec<Option<Color>>, width: usize, height: usize) -> Vec<Option<Color>> {
+        let mut result = vec![None; width * height];
+
+        let mut index = 0;
+
+        // pass 1
+        'p1: for y in (0..height as usize).step_by(8) {
+            for x in 0..width as usize {
+                let index_dst = y * width as usize + x;
+                if index_dst >= result.len() {
+                    break 'p1;
+                }
+
+                result[index_dst] = input[index];
+                index += 1;
+            }
+        }
+
+        // pass 2
+        'p2: for y in (4..height as usize).step_by(8) {
+            for x in 0..width as usize {
+                let index_dst = y * width as usize + x;
+                if index_dst >= result.len() {
+                    break 'p2;
+                }
+
+                result[index_dst] = input[index];
+                index += 1;
+            }
+        }
+
+        // pass 3
+        'p3: for y in (2..height as usize).step_by(4) {
+            for x in 0..width as usize {
+                let index_dst = y * width as usize + x;
+                if index_dst >= result.len() {
+                    break 'p3;
+                }
+
+                result[index_dst] = input[index];
+                index += 1;
+            }
+        }
+
+        // pass 4
+        'p4: for y in (1..height as usize).step_by(2) {
+            for x in 0..width as usize {
+                let index_dst = y * width as usize + x;
+                if index_dst >= result.len() {
+                    break 'p4;
+                }
+
+                result[index_dst] = input[index];
+                index += 1;
+            }
+        }
+
+        result
     }
 }
 
@@ -320,7 +429,7 @@ mod tests {
 
         let mut v = vec![];
         for i in actual.iter() {
-            v.push(i.color_values.clone());
+            v.push(i.colors.clone());
         }
 
         assert_eq!(expected, v);

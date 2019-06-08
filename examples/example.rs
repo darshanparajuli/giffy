@@ -37,7 +37,7 @@ fn main() -> Result<(), io::Error> {
                 println!("Writing frame #{} to '{}'", counter, file_name);
 
                 let mut colors = vec![];
-                for c in frame.color_values.iter() {
+                for c in frame.colors.iter() {
                     let values: [u8; 3] = (*c).into();
                     colors.extend(&values);
                 }
