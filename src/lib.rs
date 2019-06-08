@@ -42,6 +42,7 @@ pub struct Gif {
 #[derive(Debug, Clone)]
 pub struct ImageFrame {
     pub colors: Box<[Color]>,
+    pub delay_time: u16,
 }
 
 /// Attempt to load a GIF from a given `src`.
@@ -101,14 +102,15 @@ impl<'a> Decoder<'a> {
                         }
                     };
 
-                    let (transparent_flag, transparent_color_index, disposal_method) =
+                    let (transparent_flag, transparent_color_index, disposal_method, delay_time) =
                         match graphic_control_ext {
                             Some(ext) => (
                                 ext.transparent_color_index_available,
                                 ext.transparent_color_index,
                                 ext.disposal_method,
+                                ext.delay_time,
                             ),
-                            None => (false, 0, DisposalMethod::Unspecified),
+                            None => (false, 0, DisposalMethod::Unspecified, 0),
                         };
 
                     graphic_control_ext = None;
@@ -137,6 +139,7 @@ impl<'a> Decoder<'a> {
                         };
 
                         frames.push(ImageFrame {
+                            delay_time,
                             colors: result
                                 .iter()
                                 .map(|e| e.expect("Missing color value"))
@@ -169,6 +172,7 @@ impl<'a> Decoder<'a> {
 
                         let mut new_frame = match disposal_method {
                             DisposalMethod::RestoreToBackgroundColor => ImageFrame {
+                                delay_time,
                                 colors: vec![
                                     color_table[self
                                         .data
