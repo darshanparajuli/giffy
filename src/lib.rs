@@ -194,56 +194,19 @@ impl<'a> Decoder<'a> {
         let mut result = vec![None; width * height];
 
         let mut index = 0;
+        let passes = [(0, 8), (4, 8), (2, 4), (1, 2)];
 
-        // pass 1
-        'p1: for y in (0..height as usize).step_by(8) {
-            for x in 0..width as usize {
-                let index_dst = y * width as usize + x;
-                if index_dst >= result.len() {
-                    break 'p1;
+        for (start, step) in passes.iter() {
+            'l: for y in (*start..height as usize).step_by(*step) {
+                for x in 0..width as usize {
+                    let index_dst = y * width as usize + x;
+                    if index_dst >= result.len() {
+                        break 'l;
+                    }
+
+                    result[index_dst] = input[index];
+                    index += 1;
                 }
-
-                result[index_dst] = input[index];
-                index += 1;
-            }
-        }
-
-        // pass 2
-        'p2: for y in (4..height as usize).step_by(8) {
-            for x in 0..width as usize {
-                let index_dst = y * width as usize + x;
-                if index_dst >= result.len() {
-                    break 'p2;
-                }
-
-                result[index_dst] = input[index];
-                index += 1;
-            }
-        }
-
-        // pass 3
-        'p3: for y in (2..height as usize).step_by(4) {
-            for x in 0..width as usize {
-                let index_dst = y * width as usize + x;
-                if index_dst >= result.len() {
-                    break 'p3;
-                }
-
-                result[index_dst] = input[index];
-                index += 1;
-            }
-        }
-
-        // pass 4
-        'p4: for y in (1..height as usize).step_by(2) {
-            for x in 0..width as usize {
-                let index_dst = y * width as usize + x;
-                if index_dst >= result.len() {
-                    break 'p4;
-                }
-
-                result[index_dst] = input[index];
-                index += 1;
             }
         }
 
