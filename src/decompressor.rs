@@ -3,7 +3,7 @@ pub(crate) struct Decompressor<'a> {
     lzw_min_code_size: u8,
     clear_code: usize,
     code_values: Vec<usize>,
-    code_table: Vec<CodeValue>,
+    code_table: Vec<CodeType>,
     code_size: u8,
 }
 
@@ -28,14 +28,14 @@ impl<'a> Decompressor<'a> {
 
         for i in 0..self.clear_code {
             self.code_values.push(i);
-            self.code_table.push(CodeValue::Range(
+            self.code_table.push(CodeType::Range(
                 self.code_values.len() - 1,
                 self.code_values.len(),
             ));
         }
 
-        self.code_table.push(CodeValue::Single(self.clear_code));
-        self.code_table.push(CodeValue::Single(self.clear_code + 1));
+        self.code_table.push(CodeType::Raw(self.clear_code));
+        self.code_table.push(CodeType::Raw(self.clear_code + 1));
     }
 
     fn decompress_until_clear(
@@ -50,7 +50,7 @@ impl<'a> Decompressor<'a> {
             return Ok(false);
         }
 
-        if let Some(CodeValue::Range(begin, end)) = &self.code_table.get(current as usize) {
+        if let Some(CodeType::Range(begin, end)) = &self.code_table.get(current as usize) {
             for i in &self.code_values[*begin..*end] {
                 result.push(*i);
             }
@@ -70,13 +70,13 @@ impl<'a> Decompressor<'a> {
 
             if (current as usize) < self.code_table.len() {
                 match &self.code_table[current as usize] {
-                    CodeValue::Range(begin, end) => {
+                    CodeType::Range(begin, end) => {
                         for i in &self.code_values[*begin..*end] {
                             result.push(*i);
                         }
 
                         let k = self.code_values[*begin];
-                        if let CodeValue::Range(begin, end) = &self.code_table[prev as usize] {
+                        if let CodeType::Range(begin, end) = &self.code_table[prev as usize] {
                             let new_begin = self.code_values.len();
                             for i in *begin..*end {
                                 self.code_values.push(self.code_values[i]);
@@ -90,17 +90,17 @@ impl<'a> Decompressor<'a> {
                                     return Ok(true);
                                 } else {
                                     self.code_size += 1;
-                                    self.code_table.push(CodeValue::Range(new_begin, new_end));
+                                    self.code_table.push(CodeType::Range(new_begin, new_end));
                                 }
                             } else {
-                                self.code_table.push(CodeValue::Range(new_begin, new_end));
+                                self.code_table.push(CodeType::Range(new_begin, new_end));
                             }
                         } else {
                             return Err(format!("Invalid prev code type {}", prev));
                         }
                     }
 
-                    CodeValue::Single(c) => {
+                    CodeType::Raw(c) => {
                         if *c == self.clear_code {
                             return Ok(true);
                         } else if *c == self.clear_code + 1 {
@@ -111,7 +111,7 @@ impl<'a> Decompressor<'a> {
                     }
                 }
             } else {
-                if let CodeValue::Range(begin, end) = &self.code_table[prev as usize] {
+                if let CodeType::Range(begin, end) = &self.code_table[prev as usize] {
                     let new_begin = self.code_values.len();
                     for i in *begin..*end {
                         self.code_values.push(self.code_values[i]);
@@ -131,10 +131,10 @@ impl<'a> Decompressor<'a> {
                             return Ok(true);
                         } else {
                             self.code_size += 1;
-                            self.code_table.push(CodeValue::Range(new_begin, new_end));
+                            self.code_table.push(CodeType::Range(new_begin, new_end));
                         }
                     } else {
-                        self.code_table.push(CodeValue::Range(new_begin, new_end));
+                        self.code_table.push(CodeType::Range(new_begin, new_end));
                     }
                 } else {
                     return Err(format!("Invalid prev code: {}", prev));
@@ -178,9 +178,9 @@ impl<'a> Decompressor<'a> {
 }
 
 #[derive(Debug)]
-enum CodeValue {
+enum CodeType {
     Range(usize, usize),
-    Single(usize),
+    Raw(usize),
 }
 
 struct CodeReader<'a> {
