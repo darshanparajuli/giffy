@@ -1,5 +1,6 @@
 # giffy
 
+[![Build Status](https://travis-ci.org/darshanparajuli/giffy.svg?branch=master)](https://travis-ci.org/darshanparajuli/giffy)
 [![crates.io](https://img.shields.io/crates/v/giffy.svg)](https://crates.io/crates/giffy)
 
 A simple GIF decoder written in Rust.
