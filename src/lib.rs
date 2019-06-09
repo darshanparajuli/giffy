@@ -129,95 +129,130 @@ impl<'a> Decoder<'a> {
                     let index_table = decompressor.decompress()?;
 
                     if frames.is_empty() {
-                        let result = index_table
-                            .iter()
-                            .map(|i| Some(color_table[*i]))
-                            .collect::<Vec<_>>();
-
-                        let result = if image.image_descriptor.interlace_flag {
-                            Self::deinterlace(
-                                result,
-                                self.data.logical_screen_descriptor.width as usize,
-                                self.data.logical_screen_descriptor.height as usize,
-                            )
-                        } else {
-                            result
-                        };
-
-                        frames.push(ImageFrame {
+                        frames.push(self.create_first_frame(
+                            &index_table,
+                            &color_table,
+                            image.image_descriptor.interlace_flag,
                             delay_time,
-                            colors: result
-                                .iter()
-                                .map(|e| e.expect("Missing color value"))
-                                .collect(),
-                        });
+                        ));
                     } else {
-                        let top = image.image_descriptor.top as usize;
-                        let height = image.image_descriptor.height as usize;
-                        let left = image.image_descriptor.left as usize;
-                        let width = image.image_descriptor.width as usize;
-                        let image_width = self.data.logical_screen_descriptor.width as usize;
-
-                        let result = if transparent_flag {
-                            index_table
-                                .iter()
-                                .map(|i| {
-                                    if *i == transparent_color_index as usize {
-                                        None
-                                    } else {
-                                        Some(color_table[*i])
-                                    }
-                                })
-                                .collect::<Vec<_>>()
-                        } else {
-                            index_table
-                                .iter()
-                                .map(|i| Some(color_table[*i]))
-                                .collect::<Vec<_>>()
-                        };
-
-                        let mut new_frame = match disposal_method {
-                            DisposalMethod::RestoreToBackgroundColor => ImageFrame {
-                                delay_time,
-                                colors: vec![
-                                    color_table[self
-                                        .data
-                                        .logical_screen_descriptor
-                                        .background_color_index
-                                        as usize];
-                                    frames.last().unwrap().colors.len()
-                                ]
-                                .into_boxed_slice(),
-                            },
-                            DisposalMethod::DoNotDispose | DisposalMethod::Unspecified => {
-                                frames.last().unwrap().clone()
-                            }
-                            d @ _ => return Err(format!("Dispose method {:?} not supported", d)),
-                        };
-
-                        let result = if image.image_descriptor.interlace_flag {
-                            Self::deinterlace(result, width, height)
-                        } else {
-                            result
-                        };
-
-                        for y in 0..height {
-                            let offset = (top + y) * image_width + left;
-                            for x in 0..width {
-                                let c = result[y * width + x];
-                                if let Some(c) = c {
-                                    new_frame.colors[offset + x] = c;
-                                }
-                            }
-                        }
-
-                        frames.push(new_frame);
+                        frames.push(self.create_frame(
+                            &frames,
+                            &image,
+                            &index_table,
+                            &color_table,
+                            disposal_method,
+                            transparent_flag,
+                            transparent_color_index,
+                            delay_time,
+                        )?);
                     }
                 }
             }
         }
 
         Ok(frames)
+    }
+
+    fn create_first_frame(
+        &self,
+        index_table: &[usize],
+        color_table: &[Color],
+        interlace_flag: bool,
+        delay_time: u16,
+    ) -> ImageFrame {
+        let result = index_table
+            .iter()
+            .map(|i| Some(color_table[*i]))
+            .collect::<Vec<_>>();
+
+        let result = if interlace_flag {
+            Self::deinterlace(
+                result,
+                self.data.logical_screen_descriptor.width as usize,
+                self.data.logical_screen_descriptor.height as usize,
+            )
+        } else {
+            result
+        };
+
+        ImageFrame {
+            delay_time,
+            colors: result
+                .iter()
+                .map(|e| e.expect("Missing color value"))
+                .collect(),
+        }
+    }
+
+    fn create_frame(
+        &self,
+        frames: &[ImageFrame],
+        image: &TableBasedImage,
+        index_table: &[usize],
+        color_table: &[Color],
+        disposal_method: DisposalMethod,
+        transparent_flag: bool,
+        transparent_color_index: u8,
+        delay_time: u16,
+    ) -> Result<ImageFrame, String> {
+        let top = image.image_descriptor.top as usize;
+        let height = image.image_descriptor.height as usize;
+        let left = image.image_descriptor.left as usize;
+        let width = image.image_descriptor.width as usize;
+        let image_width = self.data.logical_screen_descriptor.width as usize;
+
+        let result = if transparent_flag {
+            index_table
+                .iter()
+                .map(|i| {
+                    if *i == transparent_color_index as usize {
+                        None
+                    } else {
+                        Some(color_table[*i])
+                    }
+                })
+                .collect::<Vec<_>>()
+        } else {
+            index_table
+                .iter()
+                .map(|i| Some(color_table[*i]))
+                .collect::<Vec<_>>()
+        };
+
+        let mut new_frame = match disposal_method {
+            DisposalMethod::RestoreToBackgroundColor => ImageFrame {
+                delay_time,
+                colors: vec![
+                    color_table[self.data.logical_screen_descriptor.background_color_index
+                        as usize];
+                    frames.last().unwrap().colors.len()
+                ]
+                .into_boxed_slice(),
+            },
+            DisposalMethod::DoNotDispose | DisposalMethod::Unspecified => {
+                frames.last().unwrap().clone()
+            }
+            d @ _ => return Err(format!("Dispose method {:?} not supported", d)),
+        };
+
+        let result = if image.image_descriptor.interlace_flag {
+            Self::deinterlace(result, width, height)
+        } else {
+            result
+        };
+
+        for y in 0..height {
+            let offset = (top + y) * image_width + left;
+            for x in 0..width {
+                let c = result[y * width + x];
+                if let Some(c) = c {
+                    new_frame.colors[offset + x] = c;
+                }
+            }
+        }
+
+        Ok(new_frame)
     }
 
     // Refer to https://www.w3.org/Graphics/GIF/spec-gif89a.txt for details.
