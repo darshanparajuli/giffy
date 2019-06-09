@@ -28,5 +28,5 @@ match giffy::load(&mut src) {
 cargo run --example example <gif file path> <output folder path>
 ```
 
-### Disclaimer
+## Disclaimer
 At this time, this decoder is meant to be for educational/learning purposes only.
