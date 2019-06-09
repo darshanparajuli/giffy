@@ -2,6 +2,7 @@ pub(crate) struct Decompressor<'a> {
     data_sub_blocks: &'a [u8],
     lzw_min_code_size: u8,
     clear_code: usize,
+    code_values: Vec<usize>,
     code_table: Vec<CodeValue>,
     code_size: u8,
 }
@@ -13,7 +14,8 @@ impl<'a> Decompressor<'a> {
             data_sub_blocks,
             lzw_min_code_size,
             clear_code: 1 << lzw_min_code_size,
-            code_table: Vec::new(),
+            code_values: vec![],
+            code_table: vec![],
             code_size: lzw_min_code_size + 1,
         }
     }
@@ -23,7 +25,11 @@ impl<'a> Decompressor<'a> {
 
         self.code_table.clear();
         for i in 0..self.clear_code {
-            self.code_table.push(CodeValue::Indices(vec![i as usize]));
+            self.code_values.push(i);
+            self.code_table.push(CodeValue::Range(
+                self.code_values.len() - 1,
+                self.code_values.len(),
+            ));
         }
 
         self.code_table.push(CodeValue::Single(self.clear_code));
@@ -42,8 +48,8 @@ impl<'a> Decompressor<'a> {
             return Ok(false);
         }
 
-        if let Some(CodeValue::Indices(indices)) = &self.code_table.get(current as usize) {
-            for i in indices {
+        if let Some(CodeValue::Range(begin, end)) = &self.code_table.get(current as usize) {
+            for i in &self.code_values[*begin..*end] {
                 result.push(*i);
             }
         } else {
@@ -62,18 +68,19 @@ impl<'a> Decompressor<'a> {
 
             if (current as usize) < self.code_table.len() {
                 match &self.code_table[current as usize] {
-                    CodeValue::Indices(indices) => {
-                        for i in indices.iter() {
+                    CodeValue::Range(begin, end) => {
+                        for i in &self.code_values[*begin..*end] {
                             result.push(*i);
                         }
 
-                        let k = indices[0];
-                        if let CodeValue::Indices(prev_indices) = &self.code_table[prev as usize] {
-                            let mut new_indices = vec![];
-                            for i in prev_indices.iter() {
-                                new_indices.push(*i);
+                        let k = self.code_values[*begin];
+                        if let CodeValue::Range(begin, end) = &self.code_table[prev as usize] {
+                            let new_begin = self.code_values.len();
+                            for i in *begin..*end {
+                                self.code_values.push(self.code_values[i]);
                             }
-                            new_indices.push(k);
+                            self.code_values.push(k);
+                            let new_end = self.code_values.len();
 
                             if self.code_table.len() == (1 << self.code_size) - 1 {
                                 if self.code_size == 12 {
@@ -81,15 +88,16 @@ impl<'a> Decompressor<'a> {
                                     return Ok(true);
                                 } else {
                                     self.code_size += 1;
-                                    self.code_table.push(CodeValue::Indices(new_indices));
+                                    self.code_table.push(CodeValue::Range(new_begin, new_end));
                                 }
                             } else {
-                                self.code_table.push(CodeValue::Indices(new_indices));
+                                self.code_table.push(CodeValue::Range(new_begin, new_end));
                             }
                         } else {
                             return Err(format!("Invalid prev code type {}", prev));
                         }
                     }
+
                     CodeValue::Single(c) => {
                         if *c == self.clear_code {
                             return Ok(true);
@@ -101,16 +109,17 @@ impl<'a> Decompressor<'a> {
                     }
                 }
             } else {
-                if let CodeValue::Indices(indices) = &self.code_table[prev as usize] {
-                    let mut output = vec![];
-                    for i in indices.iter() {
-                        output.push(*i);
+                if let CodeValue::Range(begin, end) = &self.code_table[prev as usize] {
+                    let new_begin = self.code_values.len();
+                    for i in *begin..*end {
+                        self.code_values.push(self.code_values[i]);
                     }
 
-                    let k = indices[0];
-                    output.push(k);
+                    let k = self.code_values[*begin];
+                    self.code_values.push(k);
+                    let new_end = self.code_values.len();
 
-                    for i in output.iter() {
+                    for i in &self.code_values[new_begin..new_end] {
                         result.push(*i);
                     }
 
@@ -120,10 +129,10 @@ impl<'a> Decompressor<'a> {
                             return Ok(true);
                         } else {
                             self.code_size += 1;
-                            self.code_table.push(CodeValue::Indices(output));
+                            self.code_table.push(CodeValue::Range(new_begin, new_end));
                         }
                     } else {
-                        self.code_table.push(CodeValue::Indices(output));
+                        self.code_table.push(CodeValue::Range(new_begin, new_end));
                     }
                 } else {
                     return Err(format!("Invalid prev code: {}", prev));
@@ -168,7 +177,7 @@ impl<'a> Decompressor<'a> {
 
 #[derive(Debug)]
 enum CodeValue {
-    Indices(Vec<usize>),
+    Range(usize, usize),
     Single(usize),
 }
 
