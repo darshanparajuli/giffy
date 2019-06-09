@@ -13,7 +13,7 @@ let mut src = File::open("<gif path>").expect("File not found");
 match giffy::load(&mut src) {
     Ok(gif) => {
         for frame in gif.image_frames {
-            // do something with frames
+            // do something with the frame
         }
     }
 

@@ -10,7 +10,7 @@
 //! match giffy::load(&mut src) {
 //!     Ok(gif) => {
 //!         for frame in gif.image_frames {
-//!             // do something with frames
+//!             // do something with the frame
 //!         }
 //!     }
 //!
@@ -33,15 +33,21 @@ pub use util::Color;
 /// This struct holds the width, height and the image frames of the GIF media.
 #[derive(Debug, Clone)]
 pub struct Gif {
+    /// The width of the GIF media.
     pub width: u32,
+    /// The height of the GIF media.
     pub height: u32,
+    /// Individual image frames.
     pub image_frames: Vec<ImageFrame>,
 }
 
-/// This struct holds the color values of the image frame.
+/// This struct is used to hold the color information and the delay time of a frame.
 #[derive(Debug, Clone)]
 pub struct ImageFrame {
+    /// The colors that make up the image frame. This is used for drawing the image frame.
     pub colors: Box<[Color]>,
+    /// The amount of time this image frame should stay on screen before moving
+    /// on to the next image frame.
     pub delay_time: u16,
 }
 
