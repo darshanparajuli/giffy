@@ -24,6 +24,8 @@ impl<'a> Decompressor<'a> {
         self.code_size = self.lzw_min_code_size + 1;
 
         self.code_table.clear();
+        self.code_values.clear();
+
         for i in 0..self.clear_code {
             self.code_values.push(i);
             self.code_table.push(CodeValue::Range(
