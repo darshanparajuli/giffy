@@ -2,7 +2,7 @@ pub(crate) struct Decompressor<'a> {
     data_sub_blocks: &'a [u8],
     lzw_min_code_size: u8,
     clear_code: usize,
-    code_values: Vec<usize>,
+    raw_codes: Vec<usize>,
     code_table: Vec<CodeType>,
     code_size: u8,
 }
@@ -14,7 +14,7 @@ impl<'a> Decompressor<'a> {
             data_sub_blocks,
             lzw_min_code_size,
             clear_code: 1 << lzw_min_code_size,
-            code_values: vec![],
+            raw_codes: vec![],
             code_table: vec![],
             code_size: lzw_min_code_size + 1,
         }
@@ -24,13 +24,13 @@ impl<'a> Decompressor<'a> {
         self.code_size = self.lzw_min_code_size + 1;
 
         self.code_table.clear();
-        self.code_values.clear();
+        self.raw_codes.clear();
 
         for i in 0..self.clear_code {
-            self.code_values.push(i);
+            self.raw_codes.push(i);
             self.code_table.push(CodeType::Range(
-                self.code_values.len() - 1,
-                self.code_values.len(),
+                self.raw_codes.len() - 1,
+                self.raw_codes.len(),
             ));
         }
 
@@ -51,7 +51,7 @@ impl<'a> Decompressor<'a> {
         }
 
         if let Some(CodeType::Range(begin, end)) = &self.code_table.get(current as usize) {
-            for i in &self.code_values[*begin..*end] {
+            for i in &self.raw_codes[*begin..*end] {
                 result.push(*i);
             }
         } else {
@@ -71,18 +71,18 @@ impl<'a> Decompressor<'a> {
             if (current as usize) < self.code_table.len() {
                 match &self.code_table[current as usize] {
                     CodeType::Range(begin, end) => {
-                        for i in &self.code_values[*begin..*end] {
+                        for i in &self.raw_codes[*begin..*end] {
                             result.push(*i);
                         }
 
-                        let k = self.code_values[*begin];
+                        let k = self.raw_codes[*begin];
                         if let CodeType::Range(begin, end) = &self.code_table[prev as usize] {
-                            let new_begin = self.code_values.len();
+                            let new_begin = self.raw_codes.len();
                             for i in *begin..*end {
-                                self.code_values.push(self.code_values[i]);
+                                self.raw_codes.push(self.raw_codes[i]);
                             }
-                            self.code_values.push(k);
-                            let new_end = self.code_values.len();
+                            self.raw_codes.push(k);
+                            let new_end = self.raw_codes.len();
 
                             if self.code_table.len() == (1 << self.code_size) - 1 {
                                 if self.code_size == 12 {
@@ -112,16 +112,16 @@ impl<'a> Decompressor<'a> {
                 }
             } else {
                 if let CodeType::Range(begin, end) = &self.code_table[prev as usize] {
-                    let new_begin = self.code_values.len();
+                    let new_begin = self.raw_codes.len();
                     for i in *begin..*end {
-                        self.code_values.push(self.code_values[i]);
+                        self.raw_codes.push(self.raw_codes[i]);
                     }
 
-                    let k = self.code_values[*begin];
-                    self.code_values.push(k);
-                    let new_end = self.code_values.len();
+                    let k = self.raw_codes[*begin];
+                    self.raw_codes.push(k);
+                    let new_end = self.raw_codes.len();
 
-                    for i in &self.code_values[new_begin..new_end] {
+                    for i in &self.raw_codes[new_begin..new_end] {
                         result.push(*i);
                     }
 
