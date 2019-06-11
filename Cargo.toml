@@ -1,6 +1,6 @@
 [package]
 name = "giffy"
-version = "0.1.6"
+version = "0.2.0"
 edition = "2018"
 authors = ["Darshan Parajuli <parajulidarshan@gmail.com>"]
 description = "A simple GIF decoder written in Rust."
