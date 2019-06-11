@@ -23,7 +23,7 @@ pub(crate) struct LogicalScreenDescriptor {
 }
 
 #[derive(Debug)]
-pub(crate) enum BlockType {
+enum BlockType {
     TableBasedImage,
     Extension(ExtensionType),
     Trailer,
@@ -31,7 +31,7 @@ pub(crate) enum BlockType {
 }
 
 #[derive(Debug)]
-pub(crate) enum ExtensionType {
+enum ExtensionType {
     ApplicationExtension,
     CommentExtension,
     GraphicControlExtension,
@@ -43,7 +43,6 @@ pub(crate) enum ExtensionType {
 pub(crate) enum DataType {
     ApplicationExtensionType(ApplicationExtension),
     CommentExtensionType(CommentExtension),
-    GraphicControlExtensionType(GraphicControlExtension),
     PlainTextExtensionType(PlainTextExtension),
     TableBasedImageType(TableBasedImage),
 }
@@ -68,6 +67,7 @@ pub(crate) enum DisposalMethod {
 
 #[derive(Debug)]
 pub(crate) struct TableBasedImage {
+    pub(crate) graphic_control_extension: Option<GraphicControlExtension>,
     pub(crate) image_descriptor: ImageDescriptor,
     pub(crate) local_color_table: Option<Vec<Color>>,
     pub(crate) image_data: ImageData,
@@ -93,6 +93,7 @@ pub(crate) struct ImageData {
 
 #[derive(Debug)]
 pub(crate) struct PlainTextExtension {
+    pub(crate) graphic_control_extension: Option<GraphicControlExtension>,
     pub(crate) text_grid_left_pos: u16,
     pub(crate) text_grid_top_pos: u16,
     pub(crate) text_grid_width: u16,
@@ -145,7 +146,7 @@ impl<'a, T: Read> Parser<'a, T> {
         loop {
             match self.read_block_type()? {
                 BlockType::TableBasedImage => {
-                    let table_based_image = self.read_table_based_image()?;
+                    let table_based_image = self.read_table_based_image(None)?;
                     data_blocks.push(DataType::TableBasedImageType(table_based_image));
                 }
 
@@ -161,12 +162,80 @@ impl<'a, T: Read> Parser<'a, T> {
                     }
 
                     ExtensionType::GraphicControlExtension => {
-                        let ext = self.read_graphic_control_extension()?;
-                        data_blocks.push(DataType::GraphicControlExtensionType(ext));
+                        let mut graphic_control_extension =
+                            Some(self.read_graphic_control_extension()?);
+
+                        // Ref: https://www.w3.org/Graphics/GIF/spec-gif89a.txt
+                        // The scope of this Extension is the graphic
+                        // rendering block that follows it; ** it is possible for other extensions to
+                        // be present between this block and its target **. This block can modify the
+                        // Image Descriptor Block and the Plain Text Extension.
+
+                        let next_block_type: Result<BlockType, String> = loop {
+                            let block_type = self.read_block_type()?;
+                            match block_type {
+                                BlockType::Extension(ref extension_type) => match extension_type {
+                                    ExtensionType::ApplicationExtension => {
+                                        let ext = self.read_application_extension()?;
+                                        data_blocks.push(DataType::ApplicationExtensionType(ext));
+                                    }
+
+                                    ExtensionType::CommentExtension => {
+                                        let ext = self.read_comment_extension()?;
+                                        data_blocks.push(DataType::CommentExtensionType(ext));
+                                    }
+
+                                    ExtensionType::GraphicControlExtension => {
+                                        graphic_control_extension
+                                            .replace(self.read_graphic_control_extension()?);
+                                    }
+
+                                    _ => break Ok(block_type),
+                                },
+
+                                BlockType::Unknown(x) => {
+                                    return Err(format!("Error: unknown block type: {:x}", x));
+                                }
+
+                                _ => break Ok(block_type),
+                            }
+                        };
+
+                        match next_block_type? {
+                            BlockType::TableBasedImage => {
+                                let table_based_image =
+                                    self.read_table_based_image(graphic_control_extension)?;
+                                data_blocks.push(DataType::TableBasedImageType(table_based_image));
+                            }
+
+                            BlockType::Extension(extension_type) => match extension_type {
+                                ExtensionType::PlainTextExtension => {
+                                    let ext =
+                                        self.read_plain_text_extension(graphic_control_extension)?;
+                                    data_blocks.push(DataType::PlainTextExtensionType(ext));
+                                }
+
+                                ExtensionType::Unknown(x) => {
+                                    return Err(format!("Error: unknown extension type: {:x}", x));
+                                }
+
+                                x @ _ => {
+                                    return Err(format!("Error: unknown extension type: {:?}", x));
+                                }
+                            },
+
+                            BlockType::Unknown(x) => {
+                                return Err(format!("Error: unknown block type: {:x}", x));
+                            }
+
+                            x @ _ => {
+                                return Err(format!("Error: unknown block type: {:?}", x));
+                            }
+                        }
                     }
 
                     ExtensionType::PlainTextExtension => {
-                        let ext = self.read_plain_text_extension()?;
+                        let ext = self.read_plain_text_extension(None)?;
                         data_blocks.push(DataType::PlainTextExtensionType(ext));
                     }
 
@@ -318,7 +387,10 @@ impl<'a, T: Read> Parser<'a, T> {
         Ok(image_desc)
     }
 
-    fn read_table_based_image(&mut self) -> Result<TableBasedImage, String> {
+    fn read_table_based_image(
+        &mut self,
+        graphic_control_extension: Option<GraphicControlExtension>,
+    ) -> Result<TableBasedImage, String> {
         let image_descriptor = self.read_image_descriptor()?;
         let local_color_table = if image_descriptor.local_color_table_flag {
             let size = 3 * (1 << (image_descriptor.local_color_table_size + 1));
@@ -334,6 +406,7 @@ impl<'a, T: Read> Parser<'a, T> {
         let data_sub_blocks = self.read_data_sub_blocks()?;
 
         Ok(TableBasedImage {
+            graphic_control_extension,
             image_descriptor,
             local_color_table,
             image_data: ImageData {
@@ -439,7 +512,10 @@ impl<'a, T: Read> Parser<'a, T> {
         })
     }
 
-    fn read_plain_text_extension(&mut self) -> Result<PlainTextExtension, String> {
+    fn read_plain_text_extension(
+        &mut self,
+        graphic_control_extension: Option<GraphicControlExtension>,
+    ) -> Result<PlainTextExtension, String> {
         let block_size = self.read_u8()?;
         if block_size != 12 {
             return Err(format!(
@@ -462,6 +538,7 @@ impl<'a, T: Read> Parser<'a, T> {
         let plain_text_data = String::from_utf8(data).map_err(|e| format!("Error: {}", e))?;
 
         return Ok(PlainTextExtension {
+            graphic_control_extension,
             text_grid_left_pos,
             text_grid_top_pos,
             text_grid_width,

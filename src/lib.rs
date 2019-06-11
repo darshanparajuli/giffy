@@ -85,15 +85,10 @@ impl<'a> Decoder<'a> {
     fn decode(&self) -> Result<Vec<ImageFrame>, String> {
         let mut frames = vec![];
 
-        let mut graphic_control_ext = None;
-
         for block in self.data.data_blocks.iter() {
             match block {
                 DataType::ApplicationExtensionType(_) => {}
                 DataType::CommentExtensionType(_) => {}
-                DataType::GraphicControlExtensionType(ext) => {
-                    graphic_control_ext.replace(ext);
-                }
                 DataType::PlainTextExtensionType(_) => {}
                 DataType::TableBasedImageType(image) => {
                     let color_table = {
@@ -109,8 +104,8 @@ impl<'a> Decoder<'a> {
                     };
 
                     let (transparent_flag, transparent_color_index, disposal_method, delay_time) =
-                        match graphic_control_ext {
-                            Some(ext) => (
+                        match image.graphic_control_extension {
+                            Some(ref ext) => (
                                 ext.transparent_color_index_available,
                                 ext.transparent_color_index,
                                 ext.disposal_method,
@@ -118,8 +113,6 @@ impl<'a> Decoder<'a> {
                             ),
                             None => (false, 0, DisposalMethod::Unspecified, 0),
                         };
-
-                    graphic_control_ext = None;
 
                     let mut decompressor = Decompressor::new(
                         &image.image_data.data_sub_blocks,
