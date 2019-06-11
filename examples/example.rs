@@ -56,7 +56,7 @@ fn main() -> Result<(), io::Error> {
 
                 let mut colors = vec![];
                 for c in frame.colors.iter() {
-                    let values: [u8; 3] = (*c).into();
+                    let values: [u8; 3] = c.into();
                     colors.extend(&values);
                 }
 

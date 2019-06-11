@@ -30,8 +30,20 @@ impl From<Color> for [u8; 3] {
     }
 }
 
+impl From<&Color> for [u8; 3] {
+    fn from(c: &Color) -> Self {
+        [c.r(), c.g(), c.b()]
+    }
+}
+
 impl From<[u8; 3]> for Color {
     fn from(array: [u8; 3]) -> Self {
+        Color(array[0], array[1], array[2])
+    }
+}
+
+impl From<&[u8]> for Color {
+    fn from(array: &[u8]) -> Self {
         Color(array[0], array[1], array[2])
     }
 }
