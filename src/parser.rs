@@ -285,10 +285,7 @@ impl<'a, T: Read> Parser<'a, T> {
             let mut table = vec![0u8; size];
             self.read_bytes(&mut table)?;
 
-            let global_color_table = table
-                .chunks_exact(3)
-                .map(|a| Color(a[0], a[1], a[2]))
-                .collect::<Vec<_>>();
+            let global_color_table = table.chunks_exact(3).map(|a| a.into()).collect::<Vec<_>>();
             lsd.global_color_table = Some(global_color_table);
         }
 
@@ -327,10 +324,7 @@ impl<'a, T: Read> Parser<'a, T> {
             let size = 3 * (1 << (image_descriptor.local_color_table_size + 1));
             let mut table = vec![0u8; size];
             self.read_bytes(&mut table)?;
-            let table = table
-                .chunks_exact(3)
-                .map(|a| Color(a[0], a[1], a[2]))
-                .collect::<Vec<_>>();
+            let table = table.chunks_exact(3).map(|a| a.into()).collect::<Vec<_>>();
             Some(table)
         } else {
             None
