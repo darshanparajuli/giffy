@@ -348,6 +348,7 @@ impl<'a, T: Read> Parser<'a, T> {
 
     fn read_data_sub_blocks(&mut self) -> Result<Vec<u8>, String> {
         let mut sub_blocks = Vec::new();
+        let mut buffer = [0u8; 256];
 
         loop {
             let block_size = self.read_u8()?;
@@ -357,10 +358,9 @@ impl<'a, T: Read> Parser<'a, T> {
                 break;
             }
 
-            let mut data = vec![0u8; block_size as usize];
-            self.read_bytes(&mut data)?;
+            self.read_bytes(&mut buffer[..block_size as usize])?;
 
-            sub_blocks.append(&mut data);
+            sub_blocks.extend_from_slice(&mut buffer[..block_size as usize]);
         }
 
         Ok(sub_blocks)
