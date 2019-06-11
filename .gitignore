@@ -5,3 +5,4 @@ Cargo.lock
 **/*.DS_Store
 test_frames*/
 test_gifs/
+test_run.sh
