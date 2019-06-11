@@ -190,18 +190,21 @@ impl<'a, T: Read> Parser<'a, T> {
         })
     }
 
+    #[inline(always)]
     fn read_bytes(&mut self, buffer: &mut [u8]) -> Result<(), String> {
         self.src
             .read_exact(buffer)
             .map_err(|e| format!("Error: {}", e))
     }
 
+    #[inline(always)]
     fn read_u8(&mut self) -> Result<u8, String> {
         let mut buffer = [0u8; 1];
         self.read_bytes(&mut buffer)?;
         Ok(buffer[0])
     }
 
+    #[inline(always)]
     fn read_u16(&mut self) -> Result<u16, String> {
         let mut buffer = [0u8; 2];
         self.read_bytes(&mut buffer)?;
