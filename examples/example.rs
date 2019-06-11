@@ -3,7 +3,7 @@ use image::ColorType;
 use rayon::prelude::*;
 use std::env;
 use std::fs::File;
-use std::io;
+use std::io::{self, BufWriter};
 use std::path::Path;
 
 fn main() -> Result<(), io::Error> {
@@ -45,8 +45,8 @@ fn main() -> Result<(), io::Error> {
             tasks.par_iter().for_each(|e| {
                 let (counter, frame, path) = e;
 
-                let mut file = File::create(&path).expect("File not found");
-                let mut encoder = BMPEncoder::new(&mut file);
+                let mut writer = BufWriter::new(File::create(&path).expect("File not found"));
+                let mut encoder = BMPEncoder::new(&mut writer);
 
                 println!(
                     "Writing frame #{} to '{}'",
