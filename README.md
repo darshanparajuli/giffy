@@ -26,8 +26,10 @@ match giffy::load(&mut src) {
 
 ## Try it
 ```
-cargo run --example example <gif file path> <output folder path>
+cargo run --example example <GIF file path> <output folder path>
 ```
+
+This example splits the `<GIF file path>` into individual images and save it in the `<output folder path>`.
 
 ## Disclaimer
 At this time, this decoder is meant to be for educational/learning purposes only.
