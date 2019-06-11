@@ -86,60 +86,55 @@ impl<'a> Decoder<'a> {
         let mut frames = vec![];
 
         for block in self.data.data_blocks.iter() {
-            match block {
-                DataType::ApplicationExtensionType(_) => {}
-                DataType::CommentExtensionType(_) => {}
-                DataType::PlainTextExtensionType(_) => {}
-                DataType::TableBasedImageType(image) => {
-                    let color_table = {
-                        if image.local_color_table.is_some() {
-                            image.local_color_table.as_ref().unwrap()
-                        } else {
-                            self.data
-                                .logical_screen_descriptor
-                                .global_color_table
-                                .as_ref()
-                                .expect("Global color table is missing!")
-                        }
+            if let DataType::TableBasedImageType(image) = block {
+                let color_table = {
+                    if image.local_color_table.is_some() {
+                        image.local_color_table.as_ref().unwrap()
+                    } else {
+                        self.data
+                            .logical_screen_descriptor
+                            .global_color_table
+                            .as_ref()
+                            .expect("Global color table is missing!")
+                    }
+                };
+
+                let (transparent_flag, transparent_color_index, disposal_method, delay_time) =
+                    match image.graphic_control_extension {
+                        Some(ref ext) => (
+                            ext.transparent_color_index_available,
+                            ext.transparent_color_index,
+                            ext.disposal_method,
+                            ext.delay_time,
+                        ),
+                        None => (false, 0, DisposalMethod::Unspecified, 0),
                     };
 
-                    let (transparent_flag, transparent_color_index, disposal_method, delay_time) =
-                        match image.graphic_control_extension {
-                            Some(ref ext) => (
-                                ext.transparent_color_index_available,
-                                ext.transparent_color_index,
-                                ext.disposal_method,
-                                ext.delay_time,
-                            ),
-                            None => (false, 0, DisposalMethod::Unspecified, 0),
-                        };
+                let mut decompressor = Decompressor::new(
+                    &image.image_data.data_sub_blocks,
+                    image.image_data.lzw_min_code_size,
+                );
 
-                    let mut decompressor = Decompressor::new(
-                        &image.image_data.data_sub_blocks,
-                        image.image_data.lzw_min_code_size,
-                    );
+                let index_table = decompressor.decompress()?;
 
-                    let index_table = decompressor.decompress()?;
-
-                    if frames.is_empty() {
-                        frames.push(self.create_first_frame(
-                            &index_table,
-                            &color_table,
-                            image.image_descriptor.interlace_flag,
-                            delay_time,
-                        ));
-                    } else {
-                        frames.push(self.create_frame(
-                            &frames,
-                            &image,
-                            &index_table,
-                            &color_table,
-                            disposal_method,
-                            transparent_flag,
-                            transparent_color_index,
-                            delay_time,
-                        )?);
-                    }
+                if frames.is_empty() {
+                    frames.push(self.create_first_frame(
+                        &index_table,
+                        &color_table,
+                        image.image_descriptor.interlace_flag,
+                        delay_time,
+                    ));
+                } else {
+                    frames.push(self.create_frame(
+                        &frames,
+                        &image,
+                        &index_table,
+                        &color_table,
+                        disposal_method,
+                        transparent_flag,
+                        transparent_color_index,
+                        delay_time,
+                    )?);
                 }
             }
         }
