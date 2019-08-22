@@ -487,7 +487,7 @@ impl<'a, T: Read> Parser<'a, T> {
             1 => DisposalMethod::DoNotDispose,
             2 => DisposalMethod::RestoreToBackgroundColor,
             3 => DisposalMethod::RestoreToPrevious,
-            4...7 => DisposalMethod::Undefined,
+            4..=7 => DisposalMethod::Undefined,
             x => {
                 return Err(format!("Error: invalid disposal method: {}", x));
             }
