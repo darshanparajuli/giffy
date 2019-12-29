@@ -95,7 +95,7 @@ impl<'a> Decoder<'a> {
                             .logical_screen_descriptor
                             .global_color_table
                             .as_ref()
-                            .expect("Global color table is missing!")
+                            .ok_or("Global color table is missing!")?
                     }
                 };
 
@@ -123,7 +123,7 @@ impl<'a> Decoder<'a> {
                         &color_table,
                         image.image_descriptor.interlace_flag,
                         delay_time,
-                    ));
+                    )?);
                 } else {
                     frames.push(self.create_frame(
                         &frames,
@@ -148,7 +148,7 @@ impl<'a> Decoder<'a> {
         color_table: &[Color],
         interlace_flag: bool,
         delay_time: u16,
-    ) -> ImageFrame {
+    ) -> Result<ImageFrame, String> {
         let result = index_table
             .iter()
             .map(|i| Some(color_table[*i]))
@@ -164,13 +164,16 @@ impl<'a> Decoder<'a> {
             result
         };
 
-        ImageFrame {
+        let result = result
+            .into_iter()
+            .collect::<Option<Vec<Color>>>()
+            .ok_or("Missing color value")?
+            .into_boxed_slice();
+
+        Ok(ImageFrame {
             delay_time,
-            colors: result
-                .iter()
-                .map(|e| e.expect("Missing color value"))
-                .collect(),
-        }
+            colors: result,
+        })
     }
 
     fn create_frame(
