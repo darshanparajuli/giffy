@@ -110,35 +110,33 @@ impl<'a> Decompressor<'a> {
                         }
                     }
                 }
-            } else {
-                if let CodeType::Range(begin, end) = &self.code_table[prev as usize] {
-                    let new_begin = self.raw_codes.len();
-                    for i in *begin..*end {
-                        self.raw_codes.push(self.raw_codes[i]);
-                    }
+            } else if let CodeType::Range(begin, end) = &self.code_table[prev as usize] {
+                let new_begin = self.raw_codes.len();
+                for i in *begin..*end {
+                    self.raw_codes.push(self.raw_codes[i]);
+                }
 
-                    let k = self.raw_codes[*begin];
-                    self.raw_codes.push(k);
-                    let new_end = self.raw_codes.len();
+                let k = self.raw_codes[*begin];
+                self.raw_codes.push(k);
+                let new_end = self.raw_codes.len();
 
-                    for i in &self.raw_codes[new_begin..new_end] {
-                        result.push(*i);
-                    }
+                for i in &self.raw_codes[new_begin..new_end] {
+                    result.push(*i);
+                }
 
-                    if self.code_table.len() == (1 << self.code_size) - 1 {
-                        if self.code_size == 12 {
-                            self.expect_clear_code(code_reader)?;
-                            return Ok(true);
-                        } else {
-                            self.code_size += 1;
-                            self.code_table.push(CodeType::Range(new_begin, new_end));
-                        }
+                if self.code_table.len() == (1 << self.code_size) - 1 {
+                    if self.code_size == 12 {
+                        self.expect_clear_code(code_reader)?;
+                        return Ok(true);
                     } else {
+                        self.code_size += 1;
                         self.code_table.push(CodeType::Range(new_begin, new_end));
                     }
                 } else {
-                    return Err(format!("Invalid prev code: {}", prev));
+                    self.code_table.push(CodeType::Range(new_begin, new_end));
                 }
+            } else {
+                return Err(format!("Invalid prev code: {}", prev));
             }
 
             prev = current;
@@ -225,10 +223,8 @@ impl<'a> CodeReader<'a> {
 
                 if self.index < self.data.len() {
                     byte = self.data[self.index];
-                } else {
-                    if bits > 0 {
-                        return None;
-                    }
+                } else if bits > 0 {
+                    return None;
                 }
             } else {
                 if bits != 0 {

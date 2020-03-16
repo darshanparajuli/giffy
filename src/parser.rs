@@ -219,7 +219,7 @@ impl<'a, T: Read> Parser<'a, T> {
                                     return Err(format!("Error: unknown extension type: {:x}", x));
                                 }
 
-                                x @ _ => {
+                                x => {
                                     return Err(format!("Error: unknown extension type: {:?}", x));
                                 }
                             },
@@ -228,7 +228,7 @@ impl<'a, T: Read> Parser<'a, T> {
                                 return Err(format!("Error: unknown block type: {:x}", x));
                             }
 
-                            x @ _ => {
+                            x => {
                                 return Err(format!("Error: unknown block type: {:?}", x));
                             }
                         }
@@ -430,7 +430,7 @@ impl<'a, T: Read> Parser<'a, T> {
 
             self.read_bytes(&mut buffer[..block_size as usize])?;
 
-            sub_blocks.extend_from_slice(&mut buffer[..block_size as usize]);
+            sub_blocks.extend_from_slice(&buffer[..block_size as usize]);
         }
 
         Ok(sub_blocks)
@@ -537,7 +537,7 @@ impl<'a, T: Read> Parser<'a, T> {
         let data = self.read_data_sub_blocks()?;
         let plain_text_data = String::from_utf8(data).map_err(|e| format!("Error: {}", e))?;
 
-        return Ok(PlainTextExtension {
+        Ok(PlainTextExtension {
             graphic_control_extension,
             text_grid_left_pos,
             text_grid_top_pos,
@@ -548,6 +548,6 @@ impl<'a, T: Read> Parser<'a, T> {
             text_fg_color_index,
             text_bg_color_index,
             plain_text_data,
-        });
+        })
     }
 }

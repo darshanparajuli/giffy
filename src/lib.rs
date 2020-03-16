@@ -224,7 +224,7 @@ impl<'a> Decoder<'a> {
             DisposalMethod::DoNotDispose | DisposalMethod::Unspecified => {
                 frames.last().unwrap().clone()
             }
-            d @ _ => return Err(format!("Dispose method {:?} not supported", d)),
+            d => return Err(format!("Dispose method {:?} not supported", d)),
         };
 
         let result = if image.image_descriptor.interlace_flag {
